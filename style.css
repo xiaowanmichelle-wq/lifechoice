@@ -28,7 +28,7 @@ body {
     position: absolute;
     width: 100%;
     height: 100%;
-    background-image: 
+    background-image:
         radial-gradient(2px 2px at 20px 30px, #eee, transparent),
         radial-gradient(2px 2px at 40px 70px, rgba(255,255,255,0.8), transparent),
         radial-gradient(1px 1px at 90px 40px, #fff, transparent),
@@ -39,7 +39,7 @@ body {
 }
 
 .stars-bg::after {
-    background-image: 
+    background-image:
         radial-gradient(1px 1px at 50px 60px, #fff, transparent),
         radial-gradient(2px 2px at 80px 10px, rgba(255,255,255,0.7), transparent),
         radial-gradient(1px 1px at 110px 50px, #eee, transparent),
@@ -64,6 +64,7 @@ body {
     opacity: 0;
     pointer-events: none;
     transition: opacity 0.8s ease;
+    overflow: hidden;
 }
 
 .page.active {
@@ -71,11 +72,18 @@ body {
     pointer-events: all;
 }
 
+/* 结果页面需要可滚动 */
+.result-page-scroll.active {
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+}
+
 /* 开始页面 */
 .intro-glow {
     position: absolute;
-    width: 400px;
-    height: 400px;
+    width: 300px;
+    height: 300px;
     border-radius: 50%;
     background: radial-gradient(circle, rgba(139, 92, 246, 0.15) 0%, transparent 70%);
     animation: pulse-glow 3s ease-in-out infinite;
@@ -103,6 +111,10 @@ body {
     animation: fade-in-up 1s ease 0.3s both;
 }
 
+.intro-desc {
+    animation: fade-in-up 1s ease 0.5s both;
+}
+
 @keyframes fade-in-up {
     from { opacity: 0; transform: translateY(20px); }
     to { opacity: 1; transform: translateY(0); }
@@ -113,6 +125,8 @@ body {
     color: white;
     box-shadow: 0 0 30px rgba(124, 58, 237, 0.3);
     animation: fade-in-up 1s ease 0.6s both;
+    border: none;
+    outline: none;
 }
 
 .start-btn:hover {
@@ -120,17 +134,24 @@ body {
     box-shadow: 0 0 50px rgba(124, 58, 237, 0.5);
 }
 
+.start-btn:active {
+    transform: scale(0.98);
+}
+
 /* 阶段页面 */
 .stage-header {
-    background: rgba(10, 10, 26, 0.9);
+    background: rgba(10, 10, 26, 0.95);
     backdrop-filter: blur(10px);
     border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    position: relative;
+    flex-shrink: 0;
 }
 
 .stage-footer {
-    background: rgba(10, 10, 26, 0.9);
+    background: rgba(10, 10, 26, 0.95);
     backdrop-filter: blur(10px);
     border-top: 1px solid rgba(255, 255, 255, 0.05);
+    flex-shrink: 0;
 }
 
 .stage-dot {
@@ -150,10 +171,52 @@ body {
     background: #7c3aed;
 }
 
+/* 阶段限制提示 */
+.limit-warning {
+    position: absolute;
+    bottom: -40px;
+    left: 50%;
+    transform: translateX(-50%) translateY(10px);
+    background: rgba(239, 68, 68, 0.9);
+    color: white;
+    padding: 8px 20px;
+    border-radius: 25px;
+    font-size: 13px;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: all 0.3s ease;
+    z-index: 30;
+    box-shadow: 0 4px 15px rgba(239, 68, 68, 0.3);
+}
+
+.limit-warning.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+    animation: warning-fade 2s ease forwards;
+}
+
+@keyframes warning-fade {
+    0% { opacity: 1; }
+    70% { opacity: 1; }
+    100% { opacity: 0; }
+}
+
+/* 阶段限制计数样式 */
+#stage-limit.limit-reached {
+    color: #ef4444;
+    animation: pulse-red 0.5s ease;
+}
+
+@keyframes pulse-red {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.2); }
+}
+
 /* 愿望按钮 */
 .wish-btn {
     position: relative;
-    padding: 16px 12px;
+    padding: 14px 10px;
     border-radius: 16px;
     border: 1px solid rgba(255, 255, 255, 0.08);
     background: rgba(255, 255, 255, 0.03);
@@ -164,10 +227,11 @@ body {
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 8px;
-    min-height: 100px;
+    gap: 6px;
+    min-height: 90px;
     text-align: center;
     overflow: hidden;
+    -webkit-tap-highlight-color: transparent;
 }
 
 .wish-btn::before {
@@ -190,14 +254,18 @@ body {
     opacity: 1;
 }
 
+.wish-btn:active {
+    transform: scale(0.96);
+}
+
 .wish-btn .wish-emoji {
-    font-size: 28px;
+    font-size: 26px;
     position: relative;
     z-index: 1;
 }
 
 .wish-btn .wish-text {
-    font-size: 13px;
+    font-size: 12px;
     line-height: 1.3;
     position: relative;
     z-index: 1;
@@ -217,11 +285,29 @@ body {
 .wish-btn.selected::after {
     content: '✓';
     position: absolute;
-    top: 6px;
-    right: 8px;
-    font-size: 14px;
+    top: 4px;
+    right: 6px;
+    font-size: 12px;
     color: #a78bfa;
     font-weight: bold;
+    z-index: 2;
+}
+
+/* 达到上限时禁用样式 */
+.wish-btn.limit-disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+    filter: grayscale(0.5);
+}
+
+.wish-btn.limit-disabled:hover {
+    transform: none;
+    box-shadow: none;
+    border-color: rgba(255, 255, 255, 0.08);
+}
+
+.wish-btn.limit-disabled::before {
+    opacity: 0;
 }
 
 /* 消失动画 */
@@ -284,11 +370,17 @@ body {
     background: linear-gradient(135deg, #7c3aed, #db2777);
     color: white;
     box-shadow: 0 0 20px rgba(124, 58, 237, 0.2);
+    border: none;
+    outline: none;
 }
 
 .next-btn:hover {
     transform: scale(1.05);
     box-shadow: 0 0 30px rgba(124, 58, 237, 0.4);
+}
+
+.next-btn:active {
+    transform: scale(0.98);
 }
 
 .next-btn:disabled {
@@ -298,52 +390,244 @@ body {
     box-shadow: none;
 }
 
-/* 结果页面 */
-.result-stage {
+/* 结果页面 - 时间轴 */
+.result-main-title {
+    background: linear-gradient(135deg, #c084fc, #f472b6, #fb923c);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.timeline-container {
+    position: relative;
+}
+
+.timeline {
+    position: relative;
+    padding-left: 40px;
+}
+
+/* 时间轴竖线 */
+.timeline::before {
+    content: '';
+    position: absolute;
+    left: 15px;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: linear-gradient(
+        to bottom,
+        rgba(251, 191, 36, 0.6),
+        rgba(52, 211, 153, 0.6),
+        rgba(96, 165, 250, 0.6),
+        rgba(244, 114, 182, 0.6),
+        rgba(167, 139, 250, 0.6)
+    );
+}
+
+/* 时间轴节点 */
+.timeline-node {
+    position: relative;
+    margin-bottom: 48px;
+    opacity: 0;
+    animation: timeline-fade-in 0.8s ease forwards;
+}
+
+.timeline-node:last-child {
+    margin-bottom: 0;
+}
+
+@keyframes timeline-fade-in {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* 时间轴圆点 */
+.timeline-dot {
+    position: absolute;
+    left: -33px;
+    top: 4px;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--dot-color);
+    box-shadow: 0 0 12px var(--dot-color), 0 0 24px rgba(124, 58, 237, 0.2);
+    z-index: 2;
+    border: 2px solid #0a0a1a;
+}
+
+.timeline-dot::after {
+    content: '';
+    position: absolute;
+    inset: -4px;
+    border-radius: 50%;
+    border: 1px solid var(--dot-color);
+    opacity: 0.3;
+    animation: dot-pulse 2s ease-in-out infinite;
+}
+
+@keyframes dot-pulse {
+    0%, 100% { transform: scale(1); opacity: 0.3; }
+    50% { transform: scale(1.5); opacity: 0; }
+}
+
+/* 时间轴内容区 */
+.timeline-content {
+    position: relative;
     background: rgba(255, 255, 255, 0.02);
     border: 1px solid rgba(255, 255, 255, 0.06);
-    border-radius: 20px;
+    border-radius: 16px;
     padding: 24px;
+    overflow: visible;
 }
 
-.result-stage-title {
-    font-family: 'Noto Serif SC', serif;
-    font-size: 1.25rem;
-    font-weight: 600;
-    margin-bottom: 16px;
-    padding-bottom: 12px;
+.timeline-content::before {
+    content: '';
+    position: absolute;
+    left: -8px;
+    top: 8px;
+    width: 16px;
+    height: 16px;
+    background: rgba(255, 255, 255, 0.02);
+    border-left: 1px solid rgba(255, 255, 255, 0.06);
     border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    transform: rotate(45deg);
 }
 
-.result-wish {
+/* 阶段标签 */
+.timeline-stage-label {
+    font-family: 'Noto Serif SC', serif;
+    font-size: 1.3rem;
+    font-weight: 700;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+}
+
+.timeline-age {
+    font-size: 0.75rem;
+    opacity: 0.5;
+    font-weight: 400;
+}
+
+/* 选中愿望标签 */
+.timeline-selected-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 16px;
+}
+
+.timeline-tag {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
-    padding: 8px 16px;
+    gap: 4px;
+    padding: 6px 14px;
     border-radius: 25px;
-    font-size: 14px;
-    margin: 4px;
-}
-
-.result-wish.selected {
+    font-size: 13px;
     background: rgba(124, 58, 237, 0.15);
-    border: 1px solid rgba(124, 58, 237, 0.3);
+    border: 1px solid rgba(124, 58, 237, 0.35);
     color: #c4b5fd;
+    font-weight: 500;
+    transition: all 0.3s ease;
+    animation: tag-glow 3s ease-in-out infinite alternate;
 }
 
-.result-wish.vanished {
-    background: rgba(239, 68, 68, 0.08);
-    border: 1px solid rgba(239, 68, 68, 0.15);
-    color: #fca5a5;
+@keyframes tag-glow {
+    0% { box-shadow: 0 0 5px rgba(124, 58, 237, 0.1); }
+    100% { box-shadow: 0 0 15px rgba(124, 58, 237, 0.25); }
+}
+
+/* 故事文字 */
+.timeline-story {
+    font-size: 0.95rem;
+    line-height: 1.9;
+    color: #b0b8c8;
+    letter-spacing: 0.02em;
+}
+
+.story-highlight {
+    color: #e0d4fc;
+    font-weight: 600;
+    padding: 2px 6px;
+    background: rgba(124, 58, 237, 0.12);
+    border-radius: 6px;
+    white-space: nowrap;
+}
+
+/* 散落的消失愿望 */
+.scattered-wishes {
+    position: relative;
+    width: 100%;
+    min-height: 50px;
+    margin-top: 20px;
+    padding: 10px 0;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 6px 12px;
+}
+
+.scattered-wish {
+    display: inline-block;
+    font-size: var(--scatter-size, 12px);
+    color: rgba(156, 163, 175, var(--scatter-opacity, 0.2));
+    transform: rotate(var(--scatter-rotate, 0deg)) translateY(var(--scatter-y, 0));
     text-decoration: line-through;
-    opacity: 0.6;
+    text-decoration-color: rgba(239, 68, 68, 0.2);
+    white-space: nowrap;
+    opacity: 0;
+    animation: scatter-appear 1s ease forwards;
+    transition: all 0.3s ease;
+    cursor: default;
+    user-select: none;
 }
 
-.result-wish.untouched {
-    background: rgba(255, 255, 255, 0.03);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    color: #9ca3af;
-    opacity: 0.4;
+.scattered-wish:hover {
+    color: rgba(252, 165, 165, 0.5);
+    transform: rotate(0deg) translateY(0) scale(1.05);
+}
+
+@keyframes scatter-appear {
+    from {
+        opacity: 0;
+        filter: blur(4px);
+    }
+    to {
+        opacity: 1;
+        filter: blur(0);
+    }
+}
+
+/* 保存图片按钮 */
+.save-btn {
+    background: linear-gradient(135deg, #059669, #0d9488);
+    color: white;
+    border: none;
+    outline: none;
+    box-shadow: 0 0 20px rgba(5, 150, 105, 0.2);
+}
+
+.save-btn:hover {
+    transform: scale(1.05);
+    box-shadow: 0 0 30px rgba(5, 150, 105, 0.4);
+}
+
+.save-btn:active {
+    transform: scale(0.98);
+}
+
+.save-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
 }
 
 /* 重新开始按钮 */
@@ -351,11 +635,16 @@ body {
     background: transparent;
     border: 1px solid rgba(124, 58, 237, 0.5);
     color: #a78bfa;
+    outline: none;
 }
 
 .restart-btn:hover {
     background: rgba(124, 58, 237, 0.1);
     transform: scale(1.05);
+}
+
+.restart-btn:active {
+    transform: scale(0.98);
 }
 
 /* 粒子效果 */
@@ -381,7 +670,7 @@ body {
 
 /* 滚动条 */
 ::-webkit-scrollbar {
-    width: 6px;
+    width: 4px;
 }
 
 ::-webkit-scrollbar-track {
@@ -395,42 +684,6 @@ body {
 
 ::-webkit-scrollbar-thumb:hover {
     background: rgba(124, 58, 237, 0.5);
-}
-
-/* 响应式 */
-@media (max-width: 768px) {
-    .intro-title {
-        font-size: 2.5rem;
-    }
-    
-    .wish-btn {
-        min-height: 80px;
-        padding: 12px 8px;
-    }
-    
-    .wish-btn .wish-emoji {
-        font-size: 22px;
-    }
-    
-    .wish-btn .wish-text {
-        font-size: 11px;
-    }
-}
-
-/* 页面切换动画增强 */
-.page-enter {
-    animation: page-slide-in 0.6s ease forwards;
-}
-
-@keyframes page-slide-in {
-    from {
-        opacity: 0;
-        transform: translateX(30px);
-    }
-    to {
-        opacity: 1;
-        transform: translateX(0);
-    }
 }
 
 /* 选择时的涟漪效果 */
@@ -479,7 +732,7 @@ body {
 
 .stage-transition-overlay h3 {
     font-family: 'Noto Serif SC', serif;
-    font-size: 2rem;
+    font-size: 1.8rem;
     background: linear-gradient(135deg, #c084fc, #f472b6);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
@@ -489,5 +742,327 @@ body {
 
 .stage-transition-overlay p {
     color: #9ca3af;
-    font-size: 1rem;
+    font-size: 0.9rem;
+}
+
+/* ========== 手机端适配 ========== */
+@media (max-width: 768px) {
+    /* 确保wish-page内部容器精确填满屏幕 */
+    #wish-page > .relative {
+        height: 100dvh;
+        height: 100vh; /* 降级方案 */
+        height: 100dvh;
+    }
+
+    #wishes-grid.max-w-6xl {
+        max-width: none;
+        height: 100%;
+    }
+}
+
+@media (max-width: 480px) {
+    .intro-title {
+        font-size: 2rem !important;
+    }
+
+    .intro-subtitle {
+        font-size: 1rem !important;
+    }
+
+    .intro-desc {
+        font-size: 0.85rem;
+        line-height: 1.8;
+    }
+
+    .start-btn {
+        padding: 14px 32px;
+        font-size: 1rem;
+    }
+
+    /* 顶部信息栏极度压缩 */
+    .stage-header {
+        padding: 6px 8px;
+    }
+
+    .stage-header .max-w-6xl {
+        gap: 4px;
+    }
+
+    .stage-header h2 {
+        font-size: 1rem !important;
+    }
+
+    .stage-header p {
+        font-size: 9px !important;
+        margin-top: 1px !important;
+    }
+
+    .stage-header .text-xs {
+        font-size: 8px !important;
+    }
+
+    .stage-header .text-lg {
+        font-size: 0.9rem !important;
+    }
+
+    .stage-dot {
+        height: 3px;
+    }
+
+    .stage-header .mt-3 {
+        margin-top: 4px;
+    }
+
+    /* 愿望网格：4列填满布局 */
+    #wishes-grid {
+        grid-template-columns: repeat(4, 1fr) !important;
+        grid-template-rows: repeat(5, 1fr) !important;
+        gap: 4px !important;
+        padding: 0 !important;
+        height: 100%;
+    }
+
+    .wish-btn {
+        min-height: 0;
+        height: 100%;
+        padding: 3px 2px;
+        border-radius: 8px;
+        gap: 1px;
+    }
+    
+    .wish-btn .wish-emoji {
+        font-size: 16px;
+    }
+    
+    .wish-btn .wish-text {
+        font-size: 9px;
+        line-height: 1.15;
+        overflow: hidden;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+    }
+
+    .wish-btn.selected::after {
+        top: 1px;
+        right: 2px;
+        font-size: 8px;
+    }
+
+    /* 愿望区域填满剩余空间 */
+    .flex-1.min-h-0 {
+        padding: 3px 4px !important;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden !important;
+    }
+
+    /* 底部栏压缩 */
+    .stage-footer {
+        padding: 6px 8px;
+    }
+
+    .stage-footer p {
+        font-size: 9px !important;
+    }
+
+    .next-btn {
+        padding: 7px 14px;
+        font-size: 0.75rem;
+    }
+
+    /* 上限警告适配 */
+    .limit-warning {
+        font-size: 11px;
+        padding: 5px 14px;
+        bottom: -30px;
+    }
+
+    /* 时间轴手机适配 */
+    .timeline {
+        padding-left: 30px;
+    }
+
+    .timeline::before {
+        left: 10px;
+    }
+
+    .timeline-dot {
+        left: -26px;
+        width: 12px;
+        height: 12px;
+    }
+
+    .timeline-content {
+        padding: 16px;
+        border-radius: 12px;
+    }
+
+    .timeline-content::before {
+        left: -6px;
+        top: 6px;
+        width: 12px;
+        height: 12px;
+    }
+
+    .timeline-stage-label {
+        font-size: 1.1rem;
+        flex-direction: column;
+        gap: 2px;
+    }
+
+    .timeline-age {
+        font-size: 0.7rem;
+    }
+
+    .timeline-selected-tags {
+        gap: 6px;
+    }
+
+    .timeline-tag {
+        padding: 4px 10px;
+        font-size: 11px;
+    }
+
+    .timeline-story {
+        font-size: 0.85rem;
+        line-height: 1.8;
+    }
+
+    .story-highlight {
+        padding: 1px 4px;
+        font-size: 0.85rem;
+    }
+
+    .scattered-wishes {
+        min-height: 30px;
+        margin-top: 14px;
+        gap: 4px 8px;
+    }
+
+    .timeline-node {
+        margin-bottom: 32px;
+    }
+
+    .stage-transition-overlay h3 {
+        font-size: 1.5rem;
+    }
+
+    .stage-transition-overlay p {
+        font-size: 0.8rem;
+    }
+
+    #result-capture h2 {
+        font-size: 1.6rem !important;
+    }
+
+    .save-btn, .restart-btn {
+        padding: 10px 24px;
+        font-size: 0.85rem;
+    }
+}
+
+@media (max-width: 768px) and (min-width: 481px) {
+    .intro-title {
+        font-size: 2.5rem !important;
+    }
+
+    .stage-header {
+        padding: 8px 12px;
+    }
+
+    /* 愿望网格：平板竖屏4列填满 */
+    #wishes-grid {
+        grid-template-columns: repeat(4, 1fr) !important;
+        grid-template-rows: repeat(5, 1fr) !important;
+        gap: 6px !important;
+        height: 100%;
+    }
+
+    .wish-btn {
+        min-height: 0;
+        height: 100%;
+        padding: 6px 4px;
+        border-radius: 10px;
+        gap: 3px;
+    }
+    
+    .wish-btn .wish-emoji {
+        font-size: 20px;
+    }
+    
+    .wish-btn .wish-text {
+        font-size: 10px;
+        line-height: 1.2;
+    }
+
+    .flex-1.min-h-0 {
+        display: flex;
+        flex-direction: column;
+        overflow: hidden !important;
+    }
+
+    .stage-footer {
+        padding: 8px 12px;
+    }
+
+    .next-btn {
+        padding: 8px 18px;
+        font-size: 0.85rem;
+    }
+}
+
+/* 安全区域适配（iPhone刘海/底部横条） */
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+    .stage-footer {
+        padding-bottom: calc(12px + env(safe-area-inset-bottom));
+    }
+    
+    #result-capture {
+        padding-bottom: calc(48px + env(safe-area-inset-bottom));
+    }
+}
+
+/* 图片预览弹窗动画 */
+@keyframes modal-fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes modal-fade-out {
+    from { opacity: 1; }
+    to { opacity: 0; }
+}
+
+/* 横屏适配 */
+@media (max-height: 500px) and (orientation: landscape) {
+    #wishes-grid {
+        grid-template-columns: repeat(5, 1fr) !important;
+        gap: 4px !important;
+    }
+
+    .wish-btn {
+        min-height: 48px;
+        padding: 4px 3px;
+    }
+    
+    .wish-btn .wish-emoji {
+        font-size: 14px;
+    }
+    
+    .wish-btn .wish-text {
+        font-size: 8px;
+    }
+
+    .stage-header {
+        padding: 4px 8px;
+    }
+
+    .stage-footer {
+        padding: 4px 8px;
+    }
+
+    .flex-1.min-h-0 {
+        padding: 2px 4px !important;
+    }
 }
