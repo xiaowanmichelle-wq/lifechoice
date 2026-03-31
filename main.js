@@ -1,11 +1,14 @@
 import { stages, lifeQuotes } from './data.js';
 
+// 配置常量
+const MAX_SELECTIONS_PER_STAGE = 5;
+
 // 应用状态
 const state = {
     currentStage: 0,
     selectedWishes: new Set(),    // 已选择的愿望ID
     vanishedWishes: new Set(),    // 已消失的愿望ID
-    stageSelections: {},          // 每个阶段的选择记录
+    stageSelections: {},          // 每个阶段的选择计数
     totalSelected: 0,
     totalVanished: 0
 };
@@ -21,6 +24,7 @@ const dom = {
     stageHint: document.getElementById('stage-hint'),
     selectedCount: document.getElementById('selected-count'),
     vanishedCount: document.getElementById('vanished-count'),
+    stageLimit: document.getElementById('stage-limit'),
     wishesGrid: document.getElementById('wishes-grid'),
     nextStageBtn: document.getElementById('next-stage-btn'),
     resultList: document.getElementById('result-list'),
@@ -29,6 +33,7 @@ const dom = {
     finalRemaining: document.getElementById('final-remaining'),
     lifeQuote: document.getElementById('life-quote'),
     restartBtn: document.getElementById('restart-btn'),
+    saveImageBtn: document.getElementById('save-image-btn'),
     particlesContainer: document.getElementById('particles-container')
 };
 
@@ -37,6 +42,7 @@ function init() {
     dom.startBtn.addEventListener('click', startJourney);
     dom.nextStageBtn.addEventListener('click', goNextStage);
     dom.restartBtn.addEventListener('click', restart);
+    dom.saveImageBtn.addEventListener('click', saveAsImage);
     
     // 使用事件委托处理愿望点击
     dom.wishesGrid.addEventListener('click', handleWishClick);
@@ -53,7 +59,21 @@ function switchPage(from, to) {
     from.classList.remove('active');
     setTimeout(() => {
         to.classList.add('active');
+        // 结果页面需要滚动到顶部
+        if (to === dom.resultPage) {
+            to.scrollTop = 0;
+        }
     }, 400);
+}
+
+// 获取当前阶段已选数量
+function getCurrentStageSelectedCount() {
+    const stage = stages[state.currentStage];
+    let count = 0;
+    stage.wishes.forEach(wish => {
+        if (state.selectedWishes.has(wish.id)) count++;
+    });
+    return count;
 }
 
 // 加载阶段
@@ -91,6 +111,19 @@ function loadStage(stageIndex) {
     
     // 渲染愿望
     renderWishes(stage);
+    updateCounters();
+    updateStageLimit();
+}
+
+// 更新阶段选择限制显示
+function updateStageLimit() {
+    const count = getCurrentStageSelectedCount();
+    dom.stageLimit.textContent = `${count}/${MAX_SELECTIONS_PER_STAGE}`;
+    if (count >= MAX_SELECTIONS_PER_STAGE) {
+        dom.stageLimit.classList.add('limit-reached');
+    } else {
+        dom.stageLimit.classList.remove('limit-reached');
+    }
 }
 
 // 渲染愿望按钮
@@ -103,14 +136,28 @@ function renderWishes(stage) {
         btn.dataset.wishId = wish.id;
         btn.style.animationDelay = `${index * 0.05}s`;
         
+        // 检查是否已消失
+        if (state.vanishedWishes.has(wish.id)) {
+            btn.className = 'wish-btn vanished';
+            btn.innerHTML = `<span class="wish-text" style="opacity:0.15; font-size:11px;">已消逝</span>`;
+            dom.wishesGrid.appendChild(btn);
+            return;
+        }
+        
         btn.innerHTML = `
             <span class="wish-emoji">${wish.emoji}</span>
             <span class="wish-text">${wish.text}</span>
         `;
         
-        // 如果之前已选择过（回退时）
+        // 如果之前已选择过
         if (state.selectedWishes.has(wish.id)) {
             btn.classList.add('selected');
+        }
+        
+        // 如果已达上限且未选中，显示禁用状态
+        const stageCount = getCurrentStageSelectedCount();
+        if (stageCount >= MAX_SELECTIONS_PER_STAGE && !state.selectedWishes.has(wish.id)) {
+            btn.classList.add('limit-disabled');
         }
         
         dom.wishesGrid.appendChild(btn);
@@ -128,11 +175,44 @@ function handleWishClick(e) {
         // 取消选择
         deselectWish(btn, wishId);
     } else {
+        // 检查是否达到上限
+        const stageCount = getCurrentStageSelectedCount();
+        if (stageCount >= MAX_SELECTIONS_PER_STAGE) {
+            // 显示上限提示动画
+            showLimitWarning();
+            return;
+        }
         // 选择愿望
         selectWish(btn, wishId);
     }
     
     updateCounters();
+    updateStageLimit();
+    updateDisabledState();
+}
+
+// 显示上限提示
+function showLimitWarning() {
+    const warning = document.getElementById('limit-warning');
+    if (warning) {
+        warning.classList.remove('show');
+        void warning.offsetWidth; // 强制回流
+        warning.classList.add('show');
+    }
+}
+
+// 更新禁用状态
+function updateDisabledState() {
+    const stageCount = getCurrentStageSelectedCount();
+    const allBtns = dom.wishesGrid.querySelectorAll('.wish-btn');
+    allBtns.forEach(btn => {
+        const id = btn.dataset.wishId;
+        if (stageCount >= MAX_SELECTIONS_PER_STAGE && !state.selectedWishes.has(id)) {
+            btn.classList.add('limit-disabled');
+        } else {
+            btn.classList.remove('limit-disabled');
+        }
+    });
 }
 
 // 选择愿望
@@ -143,8 +223,10 @@ function selectWish(btn, wishId) {
     // 添加涟漪效果
     createRipple(btn);
     
-    // 随机消失其他愿望（每选一个，消失1-2个）
-    const vanishCount = Math.random() > 0.5 ? 2 : 1;
+    // 计算消失数量：选的越多，消失的越多
+    const stageCount = getCurrentStageSelectedCount();
+    // 基础消失2个，每多选一个额外增加1个消失
+    const vanishCount = 2 + Math.floor(stageCount / 2);
     vanishRandomWishes(wishId, vanishCount);
 }
 
@@ -189,7 +271,7 @@ function vanishRandomWishes(excludeId, count) {
                 btn.innerHTML = `<span class="wish-text" style="opacity:0.15; font-size:11px;">已消逝</span>`;
                 updateCounters();
             }, 800);
-        }, i * 200);
+        }, i * 150);
     });
 }
 
@@ -197,7 +279,6 @@ function vanishRandomWishes(excludeId, count) {
 function createRipple(btn) {
     const ripple = document.createElement('div');
     ripple.className = 'ripple';
-    const rect = btn.getBoundingClientRect();
     ripple.style.left = '50%';
     ripple.style.top = '50%';
     btn.appendChild(ripple);
@@ -275,6 +356,77 @@ function showStageTransition(nextStageIndex, callback) {
     }, 1500);
 }
 
+// 生成阶段故事文字（将选择串联成一段话）
+function generateStageStory(stage, selectedWishes) {
+    const stageSelected = stage.wishes.filter(w => selectedWishes.has(w.id));
+    if (stageSelected.length === 0) {
+        return '这个阶段，你没有做出任何选择，一切都在沉默中流逝……';
+    }
+    
+    const storyTemplates = {
+        0: (wishes) => {
+            const items = wishes.map(w => `<span class="story-highlight">${w.emoji} ${w.text}</span>`);
+            if (items.length === 1) return `在童年的时光里，你最珍视的是${items[0]}。那些纯真的日子，因为这个选择而变得温暖。`;
+            if (items.length === 2) return `童年的你，拥有了${items[0]}，也得到了${items[1]}。这两份礼物，照亮了你最初的岁月。`;
+            return `在那段无忧无虑的童年里，你选择了${items.slice(0, -1).join('、')}，还有${items[items.length - 1]}。这些美好的记忆，成为了你一生的底色。`;
+        },
+        1: (wishes) => {
+            const items = wishes.map(w => `<span class="story-highlight">${w.emoji} ${w.text}</span>`);
+            if (items.length === 1) return `青春年华中，你全力以赴去追求${items[0]}。那段燃烧的岁月，只为这一个梦想。`;
+            if (items.length === 2) return `在青春的十字路口，你选择了${items[0]}，同时也拥抱了${items[1]}。热血与汗水，铸就了你的少年时代。`;
+            return `青春是一场盛大的冒险。你追逐着${items.slice(0, -1).join('、')}，最终还收获了${items[items.length - 1]}。每一步都算数。`;
+        },
+        2: (wishes) => {
+            const items = wishes.map(w => `<span class="story-highlight">${w.emoji} ${w.text}</span>`);
+            if (items.length === 1) return `而立之年，你把所有的赌注押在了${items[0]}上。这是一个沉重而坚定的选择。`;
+            if (items.length === 2) return `步入而立之年，你努力实现${items[0]}，也在追寻${items[1]}。成年人的世界里，每一步都需要勇气。`;
+            return `在人生最关键的十字路口，你选择了${items.slice(0, -1).join('、')}，以及${items[items.length - 1]}。这些选择，定义了你的人生轨迹。`;
+        },
+        3: (wishes) => {
+            const items = wishes.map(w => `<span class="story-highlight">${w.emoji} ${w.text}</span>`);
+            if (items.length === 1) return `不惑之年，你终于明白${items[0]}才是最重要的。岁月沉淀出了智慧。`;
+            if (items.length === 2) return `人到中年，你守护着${items[0]}，也珍惜着${items[1]}。这是你用半生换来的领悟。`;
+            return `在沉淀与收获的季节里，你拥有了${items.slice(0, -1).join('、')}，还有${items[items.length - 1]}。这些，就是你最珍贵的财富。`;
+        },
+        4: (wishes) => {
+            const items = wishes.map(w => `<span class="story-highlight">${w.emoji} ${w.text}</span>`);
+            if (items.length === 1) return `花甲之年，你最终选择了${items[0]}。回首一生，这便是最好的归宿。`;
+            if (items.length === 2) return `在人生的黄昏，你拥有${items[0]}和${items[1]}。夕阳下的从容，是一生最美的风景。`;
+            return `走过漫长的人生旅途，你最终拥有了${items.slice(0, -1).join('、')}，以及${items[items.length - 1]}。这一生，值得。`;
+        }
+    };
+    
+    return storyTemplates[stage.id](stageSelected);
+}
+
+// 生成散落的消失愿望
+function generateScatteredVanished(stage, vanishedWishes) {
+    const stageVanished = stage.wishes.filter(w => vanishedWishes.has(w.id));
+    if (stageVanished.length === 0) return '';
+    
+    // 为每个消失的愿望生成随机位置和角度
+    let html = '<div class="scattered-wishes">';
+    stageVanished.forEach((wish, i) => {
+        const offsetX = (Math.random() - 0.5) * 80; // -40% ~ 40%
+        const offsetY = Math.random() * 30 + 5;      // 5 ~ 35px
+        const rotate = (Math.random() - 0.5) * 16;   // -8 ~ 8deg
+        const opacity = 0.15 + Math.random() * 0.15;  // 0.15 ~ 0.30
+        const fontSize = 11 + Math.random() * 3;      // 11 ~ 14px
+        const delay = i * 0.15;
+        
+        html += `<span class="scattered-wish" style="
+            --scatter-x: ${offsetX}%;
+            --scatter-y: ${offsetY}px;
+            --scatter-rotate: ${rotate}deg;
+            --scatter-opacity: ${opacity};
+            --scatter-size: ${fontSize}px;
+            animation-delay: ${delay}s;
+        ">${wish.emoji} ${wish.text}</span>`;
+    });
+    html += '</div>';
+    return html;
+}
+
 // 显示结果
 function showResults() {
     switchPage(dom.wishPage, dom.resultPage);
@@ -289,45 +441,54 @@ function showResults() {
     animateNumber(dom.finalVanished, vanishedCount, 1500);
     animateNumber(dom.finalRemaining, remainingCount, 1500);
     
-    // 渲染每个阶段的结果
+    // 渲染时间轴
     dom.resultList.innerHTML = '';
     
+    // 时间轴线
+    const timelineInner = document.createElement('div');
+    timelineInner.className = 'timeline';
+    
     stages.forEach((stage, index) => {
-        const stageDiv = document.createElement('div');
-        stageDiv.className = 'result-stage';
-        stageDiv.style.animationDelay = `${index * 0.2}s`;
+        const node = document.createElement('div');
+        node.className = 'timeline-node';
+        node.style.animationDelay = `${index * 0.3}s`;
         
-        let wishesHtml = '';
-        stage.wishes.forEach(wish => {
-            let statusClass = 'untouched';
-            let statusIcon = '';
-            
-            if (state.selectedWishes.has(wish.id)) {
-                statusClass = 'selected';
-                statusIcon = '✓ ';
-            } else if (state.vanishedWishes.has(wish.id)) {
-                statusClass = 'vanished';
-                statusIcon = '✗ ';
-            }
-            
-            wishesHtml += `
-                <span class="result-wish ${statusClass}">
-                    ${wish.emoji} ${statusIcon}${wish.text}
-                </span>
-            `;
-        });
+        // 阶段选中的愿望
+        const stageSelected = stage.wishes.filter(w => state.selectedWishes.has(w.id));
         
-        stageDiv.innerHTML = `
-            <div class="result-stage-title" style="color: ${stage.color}">
-                ${stage.title} <span style="font-size: 0.8rem; opacity: 0.6;">${stage.subtitle}</span>
-            </div>
-            <div class="flex flex-wrap">
-                ${wishesHtml}
+        // 生成故事文字
+        const storyText = generateStageStory(stage, state.selectedWishes);
+        
+        // 生成散落的消失愿望
+        const scatteredHtml = generateScatteredVanished(stage, state.vanishedWishes);
+        
+        // 选中愿望的高亮标签
+        let selectedTagsHtml = '';
+        if (stageSelected.length > 0) {
+            selectedTagsHtml = '<div class="timeline-selected-tags">';
+            stageSelected.forEach(w => {
+                selectedTagsHtml += `<span class="timeline-tag">${w.emoji} ${w.text}</span>`;
+            });
+            selectedTagsHtml += '</div>';
+        }
+        
+        node.innerHTML = `
+            <div class="timeline-dot" style="--dot-color: ${stage.color}"></div>
+            <div class="timeline-content">
+                <div class="timeline-stage-label" style="color: ${stage.color}">
+                    ${stage.title}
+                    <span class="timeline-age">${stage.subtitle}</span>
+                </div>
+                ${selectedTagsHtml}
+                <div class="timeline-story">${storyText}</div>
+                ${scatteredHtml}
             </div>
         `;
         
-        dom.resultList.appendChild(stageDiv);
+        timelineInner.appendChild(node);
     });
+    
+    dom.resultList.appendChild(timelineInner);
     
     // 随机选择一句感悟
     const quoteIndex = Math.floor(Math.random() * lifeQuotes.length);
@@ -355,6 +516,377 @@ function animateNumber(element, target, duration) {
     }
     
     requestAnimationFrame(update);
+}
+
+// 保存为图片 - 兼容微信浏览器，使用弹窗展示图片+长按保存方案
+function saveAsImage() {
+    const btn = dom.saveImageBtn;
+    btn.textContent = '正在生成图片...';
+    btn.disabled = true;
+    
+    // 创建一个完全独立的离屏容器，不受页面布局影响
+    const offscreen = document.createElement('div');
+    offscreen.id = 'offscreen-capture';
+    offscreen.style.cssText = `
+        position: absolute;
+        left: -9999px;
+        top: 0;
+        width: 800px;
+        background: #0a0a1a;
+        color: white;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans SC', sans-serif;
+        padding: 48px 40px;
+        z-index: -1;
+        overflow: visible;
+    `;
+    
+    // 构建截图内容 - 纯HTML/内联样式，不依赖CSS文件中的复杂规则
+    let captureHtml = '';
+    
+    // 标题区
+    captureHtml += `
+        <div style="text-align: center; margin-bottom: 40px;">
+            <h2 style="font-family: 'Noto Serif SC', serif; font-size: 36px; font-weight: 700; margin-bottom: 10px;
+                background: linear-gradient(135deg, #c084fc, #f472b6, #fb923c); -webkit-background-clip: text; 
+                -webkit-text-fill-color: transparent; background-clip: text;">
+                你的人生旅途
+            </h2>
+            <p style="color: #9ca3af; font-size: 15px; margin-bottom: 12px;">每一个选择，都写就了独一无二的你</p>
+            <div style="width: 60px; height: 2px; background: linear-gradient(to right, #a855f7, #ec4899); margin: 0 auto;"></div>
+        </div>
+    `;
+    
+    // 统计区
+    const totalWishes = 100;
+    const selectedCount = state.selectedWishes.size;
+    const vanishedCount = state.vanishedWishes.size;
+    const remainingCount = totalWishes - selectedCount - vanishedCount;
+    
+    captureHtml += `
+        <div style="display: flex; justify-content: center; gap: 48px; margin-bottom: 40px;">
+            <div style="text-align: center;">
+                <p style="font-size: 36px; font-weight: 700; color: #a78bfa;">${selectedCount}</p>
+                <p style="font-size: 12px; color: #6b7280; margin-top: 4px;">你的选择</p>
+            </div>
+            <div style="text-align: center;">
+                <p style="font-size: 36px; font-weight: 700; color: #f87171;">${vanishedCount}</p>
+                <p style="font-size: 12px; color: #6b7280; margin-top: 4px;">代价</p>
+            </div>
+            <div style="text-align: center;">
+                <p style="font-size: 36px; font-weight: 700; color: #9ca3af;">${remainingCount}</p>
+                <p style="font-size: 12px; color: #6b7280; margin-top: 4px;">未曾触及</p>
+            </div>
+        </div>
+    `;
+    
+    // 时间轴区
+    const stageColors = ['#fbbf24', '#34d399', '#60a5fa', '#f472b6', '#a78bfa'];
+    captureHtml += `<div style="position: relative; padding-left: 45px; margin-bottom: 40px;">`;
+    
+    // 时间轴竖线 - 用渐变色
+    captureHtml += `<div style="position: absolute; left: 17px; top: 0; bottom: 0; width: 2px; 
+        background: linear-gradient(to bottom, ${stageColors.join(', ')});"></div>`;
+    
+    stages.forEach((stage, index) => {
+        const stageSelected = stage.wishes.filter(w => state.selectedWishes.has(w.id));
+        const stageVanished = stage.wishes.filter(w => state.vanishedWishes.has(w.id));
+        const color = stageColors[index];
+        
+        // 生成故事文字（纯文本版本，用于截图）
+        const storyText = generateStageStoryPlainHtml(stage, state.selectedWishes);
+        
+        // 选中的愿望标签
+        let tagsHtml = '';
+        if (stageSelected.length > 0) {
+            tagsHtml = '<div style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px;">';
+            stageSelected.forEach(w => {
+                tagsHtml += `<span style="display: inline-flex; align-items: center; gap: 4px; padding: 5px 12px; 
+                    border-radius: 20px; font-size: 13px; background: rgba(124, 58, 237, 0.2); 
+                    border: 1px solid rgba(124, 58, 237, 0.4); color: #c4b5fd;">${w.emoji} ${w.text}</span>`;
+            });
+            tagsHtml += '</div>';
+        }
+        
+        // 消失的愿望
+        let vanishedHtml = '';
+        if (stageVanished.length > 0) {
+            vanishedHtml = '<div style="display: flex; flex-wrap: wrap; gap: 4px 10px; margin-top: 16px; justify-content: center;">';
+            stageVanished.forEach(w => {
+                const rotate = ((Math.random() - 0.5) * 12).toFixed(1);
+                const opacity = (0.2 + Math.random() * 0.15).toFixed(2);
+                vanishedHtml += `<span style="font-size: 12px; color: rgba(156, 163, 175, ${opacity}); 
+                    text-decoration: line-through; text-decoration-color: rgba(239, 68, 68, 0.25);
+                    transform: rotate(${rotate}deg); display: inline-block;">${w.emoji} ${w.text}</span>`;
+            });
+            vanishedHtml += '</div>';
+        }
+        
+        const marginBottom = index < 4 ? '40px' : '0';
+        
+        captureHtml += `
+            <div style="position: relative; margin-bottom: ${marginBottom};">
+                <div style="position: absolute; left: -36px; top: 4px; width: 14px; height: 14px; border-radius: 50%; 
+                    background: ${color}; box-shadow: 0 0 10px ${color}; border: 2px solid #0a0a1a;"></div>
+                <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); 
+                    border-radius: 14px; padding: 22px;">
+                    <div style="font-family: 'Noto Serif SC', serif; font-size: 20px; font-weight: 700; 
+                        color: ${color}; margin-bottom: 12px;">
+                        ${stage.title}
+                        <span style="font-size: 12px; opacity: 0.5; font-weight: 400; margin-left: 8px;">${stage.subtitle}</span>
+                    </div>
+                    ${tagsHtml}
+                    <div style="font-size: 14px; line-height: 1.9; color: #b0b8c8;">${storyText}</div>
+                    ${vanishedHtml}
+                </div>
+            </div>
+        `;
+    });
+    
+    captureHtml += '</div>';
+    
+    // 感悟
+    const quoteText = dom.lifeQuote.textContent;
+    captureHtml += `
+        <div style="text-align: center; margin-bottom: 32px; padding: 0 20px;">
+            <p style="font-size: 15px; color: #9ca3af; font-style: italic; line-height: 1.8;">${quoteText}</p>
+        </div>
+    `;
+    
+    // 签名
+    captureHtml += `
+        <div style="text-align: center; color: #4b5563; font-size: 13px;">
+            <p>本应用由@在路上的kairo 制作，由With通过自然语言生成</p>
+        </div>
+    `;
+    
+    offscreen.innerHTML = captureHtml;
+    document.body.appendChild(offscreen);
+    
+    // 等待字体和内容渲染完成
+    setTimeout(() => {
+        if (typeof html2canvas !== 'undefined') {
+            html2canvas(offscreen, {
+                backgroundColor: '#0a0a1a',
+                scale: 2,
+                useCORS: true,
+                logging: false,
+                width: offscreen.scrollWidth,
+                height: offscreen.scrollHeight,
+            }).then(canvas => {
+                // 清理离屏元素
+                document.body.removeChild(offscreen);
+                
+                // 将 canvas 转为 blob，再转为 blob URL 用于展示
+                canvas.toBlob((blob) => {
+                    if (!blob) {
+                        // fallback: 使用 dataURL
+                        showImagePreview(canvas.toDataURL('image/png'));
+                        return;
+                    }
+                    const blobUrl = URL.createObjectURL(blob);
+                    showImagePreview(blobUrl);
+                }, 'image/png');
+                
+                btn.textContent = '保存为图片 📷';
+                btn.disabled = false;
+            }).catch((err) => {
+                console.error('截图失败:', err);
+                document.body.removeChild(offscreen);
+                btn.textContent = '生成失败，请重试';
+                btn.disabled = false;
+                setTimeout(() => { btn.textContent = '保存为图片 📷'; }, 2000);
+            });
+        } else {
+            document.body.removeChild(offscreen);
+            btn.textContent = '保存为图片 📷';
+            btn.disabled = false;
+        }
+    }, 500);
+}
+
+// 展示生成的图片预览弹窗（兼容微信浏览器长按保存）
+function showImagePreview(imageSrc) {
+    // 移除之前可能存在的弹窗
+    const existingModal = document.getElementById('image-preview-modal');
+    if (existingModal) existingModal.remove();
+    
+    // 创建全屏弹窗
+    const modal = document.createElement('div');
+    modal.id = 'image-preview-modal';
+    modal.style.cssText = `
+        position: fixed;
+        inset: 0;
+        z-index: 9999;
+        background: rgba(0, 0, 0, 0.92);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: flex-start;
+        padding: 20px;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+        animation: modal-fade-in 0.3s ease;
+    `;
+    
+    // 顶部提示栏
+    const topBar = document.createElement('div');
+    topBar.style.cssText = `
+        width: 100%;
+        max-width: 600px;
+        text-align: center;
+        margin-bottom: 16px;
+        flex-shrink: 0;
+    `;
+    topBar.innerHTML = `
+        <p style="color: #e2e8f0; font-size: 16px; font-weight: 600; margin-bottom: 6px;">📷 图片已生成</p>
+        <p style="color: #9ca3af; font-size: 13px;">长按下方图片即可保存到手机相册</p>
+    `;
+    modal.appendChild(topBar);
+    
+    // 图片容器
+    const imgContainer = document.createElement('div');
+    imgContainer.style.cssText = `
+        width: 100%;
+        max-width: 600px;
+        flex-shrink: 0;
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);
+        margin-bottom: 20px;
+    `;
+    
+    const img = document.createElement('img');
+    img.src = imageSrc;
+    img.style.cssText = `
+        width: 100%;
+        display: block;
+        -webkit-touch-callout: default;
+        -webkit-user-select: auto;
+        user-select: auto;
+    `;
+    img.alt = '我的人生愿望清单';
+    imgContainer.appendChild(img);
+    modal.appendChild(imgContainer);
+    
+    // 底部按钮区域
+    const btnContainer = document.createElement('div');
+    btnContainer.style.cssText = `
+        display: flex;
+        gap: 12px;
+        flex-shrink: 0;
+        flex-wrap: wrap;
+        justify-content: center;
+        margin-bottom: 20px;
+    `;
+    
+    // 尝试下载按钮（非微信环境可用）
+    const downloadBtn = document.createElement('button');
+    downloadBtn.textContent = '下载图片 ⬇️';
+    downloadBtn.style.cssText = `
+        padding: 12px 28px;
+        border-radius: 25px;
+        border: none;
+        background: linear-gradient(135deg, #059669, #0d9488);
+        color: white;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        box-shadow: 0 0 15px rgba(5, 150, 105, 0.3);
+    `;
+    downloadBtn.addEventListener('click', () => {
+        // 尝试用 <a download> 下载
+        try {
+            const link = document.createElement('a');
+            link.download = '我的人生愿望清单.png';
+            link.href = imageSrc;
+            link.click();
+        } catch(e) {
+            // 如果失败，提示用户长按保存
+            alert('当前浏览器不支持直接下载，请长按图片保存');
+        }
+    });
+    btnContainer.appendChild(downloadBtn);
+    
+    // 关闭按钮
+    const closeBtn = document.createElement('button');
+    closeBtn.textContent = '关闭 ✕';
+    closeBtn.style.cssText = `
+        padding: 12px 28px;
+        border-radius: 25px;
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        background: transparent;
+        color: #e2e8f0;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+    `;
+    closeBtn.addEventListener('click', () => {
+        modal.style.animation = 'modal-fade-out 0.3s ease forwards';
+        setTimeout(() => {
+            modal.remove();
+            // 释放blob URL
+            if (imageSrc.startsWith('blob:')) {
+                URL.revokeObjectURL(imageSrc);
+            }
+        }, 300);
+    });
+    btnContainer.appendChild(closeBtn);
+    
+    modal.appendChild(btnContainer);
+    
+    // 点击弹窗背景关闭（但点击图片不关闭）
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+            closeBtn.click();
+        }
+    });
+    
+    document.body.appendChild(modal);
+}
+
+// 为截图生成故事HTML（使用内联样式的高亮）
+function generateStageStoryPlainHtml(stage, selectedWishes) {
+    const stageSelected = stage.wishes.filter(w => selectedWishes.has(w.id));
+    if (stageSelected.length === 0) {
+        return '这个阶段，你没有做出任何选择，一切都在沉默中流逝……';
+    }
+    
+    const makeHighlight = (w) => `<span style="color: #e0d4fc; font-weight: 600; padding: 2px 6px; background: rgba(124, 58, 237, 0.15); border-radius: 5px;">${w.emoji} ${w.text}</span>`;
+    
+    const storyTemplates = {
+        0: (wishes) => {
+            const items = wishes.map(makeHighlight);
+            if (items.length === 1) return `在童年的时光里，你最珍视的是${items[0]}。那些纯真的日子，因为这个选择而变得温暖。`;
+            if (items.length === 2) return `童年的你，拥有了${items[0]}，也得到了${items[1]}。这两份礼物，照亮了你最初的岁月。`;
+            return `在那段无忧无虑的童年里，你选择了${items.slice(0, -1).join('、')}，还有${items[items.length - 1]}。这些美好的记忆，成为了你一生的底色。`;
+        },
+        1: (wishes) => {
+            const items = wishes.map(makeHighlight);
+            if (items.length === 1) return `青春年华中，你全力以赴去追求${items[0]}。那段燃烧的岁月，只为这一个梦想。`;
+            if (items.length === 2) return `在青春的十字路口，你选择了${items[0]}，同时也拥抱了${items[1]}。热血与汗水，铸就了你的少年时代。`;
+            return `青春是一场盛大的冒险。你追逐着${items.slice(0, -1).join('、')}，最终还收获了${items[items.length - 1]}。每一步都算数。`;
+        },
+        2: (wishes) => {
+            const items = wishes.map(makeHighlight);
+            if (items.length === 1) return `而立之年，你把所有的赌注押在了${items[0]}上。这是一个沉重而坚定的选择。`;
+            if (items.length === 2) return `步入而立之年，你努力实现${items[0]}，也在追寻${items[1]}。成年人的世界里，每一步都需要勇气。`;
+            return `在人生最关键的十字路口，你选择了${items.slice(0, -1).join('、')}，以及${items[items.length - 1]}。这些选择，定义了你的人生轨迹。`;
+        },
+        3: (wishes) => {
+            const items = wishes.map(makeHighlight);
+            if (items.length === 1) return `不惑之年，你终于明白${items[0]}才是最重要的。岁月沉淀出了智慧。`;
+            if (items.length === 2) return `人到中年，你守护着${items[0]}，也珍惜着${items[1]}。这是你用半生换来的领悟。`;
+            return `在沉淀与收获的季节里，你拥有了${items.slice(0, -1).join('、')}，还有${items[items.length - 1]}。这些，就是你最珍贵的财富。`;
+        },
+        4: (wishes) => {
+            const items = wishes.map(makeHighlight);
+            if (items.length === 1) return `花甲之年，你最终选择了${items[0]}。回首一生，这便是最好的归宿。`;
+            if (items.length === 2) return `在人生的黄昏，你拥有${items[0]}和${items[1]}。夕阳下的从容，是一生最美的风景。`;
+            return `走过漫长的人生旅途，你最终拥有了${items.slice(0, -1).join('、')}，以及${items[items.length - 1]}。这一生，值得。`;
+        }
+    };
+    
+    return storyTemplates[stage.id](stageSelected);
 }
 
 // 重新开始
