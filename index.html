@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>人生的选择是有代价的</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600;700&display=swap" rel="stylesheet">
+</head>
+<body class="min-h-screen bg-gray-950 text-white overflow-hidden">
+    <!-- 开始页面 -->
+    <div id="intro-page" class="page active">
+        <div class="stars-bg"></div>
+        <div class="flex flex-col items-center justify-center min-h-screen px-6 relative z-10">
+            <div class="intro-glow"></div>
+            <h1 class="text-5xl md:text-7xl font-bold mb-6 text-center intro-title" style="font-family: 'Noto Serif SC', serif;">
+                人生的选择
+            </h1>
+            <p class="text-xl md:text-2xl text-gray-300 mb-4 text-center intro-subtitle">是有代价的</p>
+            <div class="w-16 h-0.5 bg-gradient-to-r from-purple-500 to-pink-500 mb-8"></div>
+            <p class="text-gray-400 text-center max-w-lg mb-12 leading-relaxed">
+                每一个选择都意味着放弃另一种可能。<br>
+                在这段旅程中，你将经历人生的五个阶段，<br>
+                选择你渴望的，但也要准备好失去一些东西。
+            </p>
+            <button id="start-btn" class="start-btn px-10 py-4 rounded-full text-lg font-semibold transition-all duration-500">
+                开始人生旅程 →
+            </button>
+        </div>
+    </div>
+
+    <!-- 愿望选择页面 -->
+    <div id="wish-page" class="page">
+        <div class="stars-bg"></div>
+        <div class="relative z-10 flex flex-col min-h-screen">
+            <!-- 顶部信息栏 -->
+            <div class="stage-header px-6 py-4">
+                <div class="max-w-6xl mx-auto flex items-center justify-between">
+                    <div>
+                        <h2 id="stage-title" class="text-2xl md:text-3xl font-bold" style="font-family: 'Noto Serif SC', serif;"></h2>
+                        <p id="stage-desc" class="text-gray-400 text-sm mt-1"></p>
+                    </div>
+                    <div class="flex items-center gap-4">
+                        <div class="text-right">
+                            <p class="text-xs text-gray-500">已选择</p>
+                            <p id="selected-count" class="text-2xl font-bold text-purple-400">0</p>
+                        </div>
+                        <div class="text-right">
+                            <p class="text-xs text-gray-500">已消失</p>
+                            <p id="vanished-count" class="text-2xl font-bold text-red-400">0</p>
+                        </div>
+                    </div>
+                </div>
+                <!-- 进度条 -->
+                <div class="max-w-6xl mx-auto mt-3">
+                    <div class="flex gap-2">
+                        <div class="stage-dot" data-stage="0"></div>
+                        <div class="stage-dot" data-stage="1"></div>
+                        <div class="stage-dot" data-stage="2"></div>
+                        <div class="stage-dot" data-stage="3"></div>
+                        <div class="stage-dot" data-stage="4"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 愿望网格 -->
+            <div class="flex-1 px-6 py-6 overflow-y-auto">
+                <div id="wishes-grid" class="max-w-6xl mx-auto grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                </div>
+            </div>
+
+            <!-- 底部操作栏 -->
+            <div class="stage-footer px-6 py-4">
+                <div class="max-w-6xl mx-auto flex items-center justify-between">
+                    <p id="stage-hint" class="text-gray-500 text-sm italic"></p>
+                    <button id="next-stage-btn" class="next-btn px-8 py-3 rounded-full font-semibold transition-all duration-300">
+                        下一阶段 →
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 结果页面 -->
+    <div id="result-page" class="page">
+        <div class="stars-bg"></div>
+        <div class="relative z-10 min-h-screen flex flex-col items-center py-12 px-6">
+            <h2 class="text-4xl md:text-5xl font-bold mb-3 text-center" style="font-family: 'Noto Serif SC', serif;">
+                你的人生愿望清单
+            </h2>
+            <p class="text-gray-400 mb-2 text-center">这就是你选择的人生</p>
+            <div class="w-16 h-0.5 bg-gradient-to-r from-purple-500 to-pink-500 mb-8"></div>
+
+            <!-- 统计信息 -->
+            <div class="flex gap-8 mb-10">
+                <div class="text-center">
+                    <p id="final-selected" class="text-4xl font-bold text-purple-400">0</p>
+                    <p class="text-xs text-gray-500 mt-1">已实现的愿望</p>
+                </div>
+                <div class="text-center">
+                    <p id="final-vanished" class="text-4xl font-bold text-red-400">0</p>
+                    <p class="text-xs text-gray-500 mt-1">消失的愿望</p>
+                </div>
+                <div class="text-center">
+                    <p id="final-remaining" class="text-4xl font-bold text-gray-400">0</p>
+                    <p class="text-xs text-gray-500 mt-1">未曾触及</p>
+                </div>
+            </div>
+
+            <!-- 愿望清单 -->
+            <div id="result-list" class="max-w-4xl w-full space-y-6 mb-12"></div>
+
+            <!-- 感悟 -->
+            <div class="max-w-2xl text-center mb-10">
+                <p id="life-quote" class="text-lg text-gray-300 italic leading-relaxed"></p>
+            </div>
+
+            <div class="flex gap-4">
+                <button id="restart-btn" class="restart-btn px-8 py-3 rounded-full font-semibold transition-all duration-300">
+                    重新开始 ↺
+                </button>
+            </div>
+
+            <div class="mt-12">
+                <p>由 <a href="https://with.woa.com/" style="color: #8A2BE2;" target="_blank">With</a> 通过自然语言生成</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- 消失动画的粒子容器 -->
+    <div id="particles-container" class="fixed inset-0 pointer-events-none z-50"></div>
+
+    <script type="module" src="main.js"></script>
+</body>
+</html>
