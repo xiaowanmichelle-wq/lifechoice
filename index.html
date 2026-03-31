@@ -2,13 +2,14 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>人生的选择是有代价的</title>
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
     <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 </head>
-<body class="min-h-screen bg-gray-950 text-white overflow-hidden">
+<body class="min-h-screen bg-gray-950 text-white">
     <!-- 开始页面 -->
     <div id="intro-page" class="page active">
         <div class="stars-bg"></div>
@@ -19,7 +20,7 @@
             </h1>
             <p class="text-xl md:text-2xl text-gray-300 mb-4 text-center intro-subtitle">是有代价的</p>
             <div class="w-16 h-0.5 bg-gradient-to-r from-purple-500 to-pink-500 mb-8"></div>
-            <p class="text-gray-400 text-center max-w-lg mb-12 leading-relaxed">
+            <p class="text-gray-400 text-center max-w-lg mb-12 leading-relaxed intro-desc">
                 每一个选择都意味着放弃另一种可能。<br>
                 在这段旅程中，你将经历人生的五个阶段，<br>
                 选择你渴望的，但也要准备好失去一些东西。
@@ -33,22 +34,26 @@
     <!-- 愿望选择页面 -->
     <div id="wish-page" class="page">
         <div class="stars-bg"></div>
-        <div class="relative z-10 flex flex-col min-h-screen">
+        <div class="relative z-10 flex flex-col h-full">
             <!-- 顶部信息栏 -->
-            <div class="stage-header px-6 py-4">
+            <div class="stage-header px-4 md:px-6 py-3 md:py-4">
                 <div class="max-w-6xl mx-auto flex items-center justify-between">
-                    <div>
-                        <h2 id="stage-title" class="text-2xl md:text-3xl font-bold" style="font-family: 'Noto Serif SC', serif;"></h2>
-                        <p id="stage-desc" class="text-gray-400 text-sm mt-1"></p>
+                    <div class="flex-1 min-w-0">
+                        <h2 id="stage-title" class="text-xl md:text-3xl font-bold truncate" style="font-family: 'Noto Serif SC', serif;"></h2>
+                        <p id="stage-desc" class="text-gray-400 text-xs md:text-sm mt-1 truncate"></p>
                     </div>
-                    <div class="flex items-center gap-4">
+                    <div class="flex items-center gap-3 md:gap-4 ml-3 flex-shrink-0">
+                        <div class="text-right">
+                            <p class="text-xs text-gray-500">本阶段</p>
+                            <p id="stage-limit" class="text-lg md:text-2xl font-bold text-yellow-400">0/5</p>
+                        </div>
                         <div class="text-right">
                             <p class="text-xs text-gray-500">已选择</p>
-                            <p id="selected-count" class="text-2xl font-bold text-purple-400">0</p>
+                            <p id="selected-count" class="text-lg md:text-2xl font-bold text-purple-400">0</p>
                         </div>
                         <div class="text-right">
                             <p class="text-xs text-gray-500">已消失</p>
-                            <p id="vanished-count" class="text-2xl font-bold text-red-400">0</p>
+                            <p id="vanished-count" class="text-lg md:text-2xl font-bold text-red-400">0</p>
                         </div>
                     </div>
                 </div>
@@ -62,19 +67,23 @@
                         <div class="stage-dot" data-stage="4"></div>
                     </div>
                 </div>
+                <!-- 上限提示 -->
+                <div id="limit-warning" class="limit-warning">
+                    ⚠️ 本阶段最多只能选择 5 个愿望
+                </div>
             </div>
 
             <!-- 愿望网格 -->
-            <div class="flex-1 px-6 py-6 overflow-y-auto">
-                <div id="wishes-grid" class="max-w-6xl mx-auto grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
+            <div class="flex-1 min-h-0 px-3 md:px-6 py-4 md:py-6 overflow-y-auto">
+                <div id="wishes-grid" class="max-w-6xl mx-auto grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 md:gap-4">
                 </div>
             </div>
 
             <!-- 底部操作栏 -->
-            <div class="stage-footer px-6 py-4">
+            <div class="stage-footer px-4 md:px-6 py-3 md:py-4">
                 <div class="max-w-6xl mx-auto flex items-center justify-between">
-                    <p id="stage-hint" class="text-gray-500 text-sm italic"></p>
-                    <button id="next-stage-btn" class="next-btn px-8 py-3 rounded-full font-semibold transition-all duration-300">
+                    <p id="stage-hint" class="text-gray-500 text-xs md:text-sm italic flex-1 mr-3"></p>
+                    <button id="next-stage-btn" class="next-btn px-6 md:px-8 py-2.5 md:py-3 rounded-full text-sm md:text-base font-semibold transition-all duration-300 flex-shrink-0">
                         下一阶段 →
                     </button>
                 </div>
@@ -83,47 +92,49 @@
     </div>
 
     <!-- 结果页面 -->
-    <div id="result-page" class="page">
+    <div id="result-page" class="page result-page-scroll">
         <div class="stars-bg"></div>
-        <div class="relative z-10 min-h-screen flex flex-col items-center py-12 px-6">
-            <h2 class="text-4xl md:text-5xl font-bold mb-3 text-center" style="font-family: 'Noto Serif SC', serif;">
-                你的人生愿望清单
+        <div id="result-capture" class="relative z-10 min-h-screen flex flex-col items-center py-8 md:py-12 px-4 md:px-6">
+            <h2 class="text-3xl md:text-5xl font-bold mb-3 text-center result-main-title" style="font-family: 'Noto Serif SC', serif;">
+                你的人生旅途
             </h2>
-            <p class="text-gray-400 mb-2 text-center">这就是你选择的人生</p>
-            <div class="w-16 h-0.5 bg-gradient-to-r from-purple-500 to-pink-500 mb-8"></div>
+            <p class="text-gray-400 mb-2 text-center text-sm md:text-base">每一个选择，都写就了独一无二的你</p>
+            <div class="w-16 h-0.5 bg-gradient-to-r from-purple-500 to-pink-500 mb-6 md:mb-8"></div>
 
             <!-- 统计信息 -->
-            <div class="flex gap-8 mb-10">
+            <div class="flex gap-6 md:gap-8 mb-8 md:mb-10">
                 <div class="text-center">
-                    <p id="final-selected" class="text-4xl font-bold text-purple-400">0</p>
-                    <p class="text-xs text-gray-500 mt-1">已实现的愿望</p>
+                    <p id="final-selected" class="text-3xl md:text-4xl font-bold text-purple-400">0</p>
+                    <p class="text-xs text-gray-500 mt-1">你的选择</p>
                 </div>
                 <div class="text-center">
-                    <p id="final-vanished" class="text-4xl font-bold text-red-400">0</p>
-                    <p class="text-xs text-gray-500 mt-1">消失的愿望</p>
+                    <p id="final-vanished" class="text-3xl md:text-4xl font-bold text-red-400">0</p>
+                    <p class="text-xs text-gray-500 mt-1">代价</p>
                 </div>
                 <div class="text-center">
-                    <p id="final-remaining" class="text-4xl font-bold text-gray-400">0</p>
+                    <p id="final-remaining" class="text-3xl md:text-4xl font-bold text-gray-400">0</p>
                     <p class="text-xs text-gray-500 mt-1">未曾触及</p>
                 </div>
             </div>
 
-            <!-- 愿望清单 -->
-            <div id="result-list" class="max-w-4xl w-full space-y-6 mb-12"></div>
+            <!-- 时间轴愿望清单 -->
+            <div id="result-list" class="timeline-container max-w-3xl w-full mb-8 md:mb-12"></div>
 
             <!-- 感悟 -->
-            <div class="max-w-2xl text-center mb-10">
-                <p id="life-quote" class="text-lg text-gray-300 italic leading-relaxed"></p>
+            <div class="max-w-2xl text-center mb-8 md:mb-10 px-4">
+                <p id="life-quote" class="text-base md:text-lg text-gray-300 italic leading-relaxed"></p>
             </div>
 
-            <div class="flex gap-4">
-                <button id="restart-btn" class="restart-btn px-8 py-3 rounded-full font-semibold transition-all duration-300">
+            <div class="flex gap-4 flex-wrap justify-center">
+                <button id="save-image-btn" class="save-btn px-6 md:px-8 py-2.5 md:py-3 rounded-full text-sm md:text-base font-semibold transition-all duration-300">
+                    保存为图片 📷
+                </button>
+                <button id="restart-btn" class="restart-btn px-6 md:px-8 py-2.5 md:py-3 rounded-full text-sm md:text-base font-semibold transition-all duration-300">
                     重新开始 ↺
                 </button>
             </div>
 
-            <div class="mt-12">
-                <p>由 <a href="https://with.woa.com/" style="color: #8A2BE2;" target="_blank">With</a> 通过自然语言生成</p>
+            <div class="mt-8 md:mt-12">
             </div>
         </div>
     </div>
