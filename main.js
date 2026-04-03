@@ -1,4 +1,4 @@
-import { stages, lifeQuotes } from './data.js';
+import { stages, lifeQuotes, traitDimensions, personalityTypes } from './data.js';
 
 // 配置常量
 const MAX_SELECTIONS_PER_STAGE = 5;
@@ -8,6 +8,7 @@ const state = {
     currentStage: 0,
     selectedWishes: new Set(),    // 已选择的愿望ID
     vanishedWishes: new Set(),    // 已消失的愿望ID
+    triggeredVanish: new Set(),   // 已经触发过消失效果的愿望ID（防止反复选择/取消重复触发）
     stageSelections: {},          // 每个阶段的选择计数
     totalSelected: 0,
     totalVanished: 0
@@ -223,11 +224,16 @@ function selectWish(btn, wishId) {
     // 添加涟漪效果
     createRipple(btn);
     
-    // 计算消失数量：选的越多，消失的越多
-    const stageCount = getCurrentStageSelectedCount();
-    // 基础消失2个，每多选一个额外增加1个消失
-    const vanishCount = 2 + Math.floor(stageCount / 2);
-    vanishRandomWishes(wishId, vanishCount);
+    // 只有首次选择该愿望时才触发消失效果，防止反复选择/取消重复触发
+    if (!state.triggeredVanish.has(wishId)) {
+        state.triggeredVanish.add(wishId);
+        
+        // 计算消失数量：选的越多，消失的越多
+        const stageCount = getCurrentStageSelectedCount();
+        // 基础消失2个，每多选一个额外增加1个消失
+        const vanishCount = 2 + Math.floor(stageCount / 2);
+        vanishRandomWishes(wishId, vanishCount);
+    }
 }
 
 // 取消选择
@@ -241,8 +247,8 @@ function vanishRandomWishes(excludeId, count) {
     const availableBtns = Array.from(dom.wishesGrid.querySelectorAll('.wish-btn'))
         .filter(btn => {
             const id = btn.dataset.wishId;
-            return id !== excludeId && 
-                   !state.selectedWishes.has(id) && 
+            return id !== excludeId &&
+                   !state.selectedWishes.has(id) &&
                    !state.vanishedWishes.has(id) &&
                    !btn.classList.contains('vanished') &&
                    !btn.classList.contains('vanishing');
@@ -490,6 +496,23 @@ function showResults() {
     
     dom.resultList.appendChild(timelineInner);
     
+    // ========== 人格分析 ==========
+    const personalityScores = calculatePersonalityScores();
+    const personalityType = matchPersonalityType(personalityScores);
+    
+    // 渲染人格分析卡片
+    const personalityContainer = document.getElementById('personality-result');
+    if (personalityContainer) {
+        personalityContainer.innerHTML = generatePersonalityHtml(personalityScores, personalityType);
+        
+        // 延迟触发进度条动画
+        setTimeout(() => {
+            personalityContainer.querySelectorAll('.trait-bar-fill').forEach(bar => {
+                bar.style.width = bar.dataset.width + '%';
+            });
+        }, 800);
+    }
+    
     // 随机选择一句感悟
     const quoteIndex = Math.floor(Math.random() * lifeQuotes.length);
     dom.lifeQuote.textContent = `"${lifeQuotes[quoteIndex]}"`;
@@ -578,6 +601,11 @@ function saveAsImage() {
             </div>
         </div>
     `;
+    
+    // 人格分析（截图版）- 放在时间轴之前
+    const imgScores = calculatePersonalityScores();
+    const imgType = matchPersonalityType(imgScores);
+    captureHtml += generatePersonalityImageHtml(imgScores, imgType);
     
     // 时间轴区
     const stageColors = ['#fbbf24', '#34d399', '#60a5fa', '#f472b6', '#a78bfa'];
@@ -889,11 +917,211 @@ function generateStageStoryPlainHtml(stage, selectedWishes) {
     return storyTemplates[stage.id](stageSelected);
 }
 
+// ========== 人格分析系统 ==========
+
+// 计算人格维度得分
+function calculatePersonalityScores() {
+    const scores = { O: 0, C: 0, E: 0, A: 0, N: 0 };
+    let count = 0;
+    
+    // 遍历所有阶段，累加已选愿望的人格得分
+    stages.forEach(stage => {
+        stage.wishes.forEach(wish => {
+            if (state.selectedWishes.has(wish.id) && wish.traits) {
+                Object.keys(scores).forEach(key => {
+                    scores[key] += wish.traits[key] || 0;
+                });
+                count++;
+            }
+        });
+    });
+    
+    // 归一化到 0~1 范围
+    if (count > 0) {
+        const maxPossible = count * 2; // 每个维度最高+2
+        Object.keys(scores).forEach(key => {
+            // 将 [-2*count, +2*count] 映射到 [0, 1]
+            scores[key] = (scores[key] + maxPossible) / (2 * maxPossible);
+            scores[key] = Math.max(0, Math.min(1, scores[key]));
+        });
+    }
+    
+    return scores;
+}
+
+// 匹配人格类型
+function matchPersonalityType(scores) {
+    // 按优先级遍历人格类型，返回第一个匹配的
+    for (const type of personalityTypes) {
+        if (type.id === 'balanced') continue; // 跳过默认类型
+        if (type.condition(scores)) {
+            return type;
+        }
+    }
+    // 如果都不匹配，返回默认的"均衡者"
+    return personalityTypes.find(t => t.id === 'balanced');
+}
+
+// 获取前两个最突出的维度
+function getTopDimensions(scores) {
+    const sorted = Object.entries(scores)
+        .sort((a, b) => b[1] - a[1]);
+    return sorted.slice(0, 2).map(([key, value]) => ({
+        key,
+        value,
+        ...traitDimensions[key]
+    }));
+}
+
+// 生成人格分析HTML（用于页面展示）
+function generatePersonalityHtml(scores, personalityType) {
+    const topDims = getTopDimensions(scores);
+    
+    // 雷达图数据（用CSS实现简化版）
+    const dims = ['O', 'C', 'E', 'A', 'N'];
+    const radarBars = dims.map(key => {
+        const dim = traitDimensions[key];
+        const pct = Math.round(scores[key] * 100);
+        return `
+            <div class="trait-bar-item">
+                <div class="trait-bar-label">
+                    <span class="trait-bar-icon">${dim.icon}</span>
+                    <span class="trait-bar-name">${dim.name}</span>
+                    <span class="trait-bar-pct">${pct}%</span>
+                </div>
+                <div class="trait-bar-track">
+                    <div class="trait-bar-fill" style="width: ${pct}%; background: ${dim.color}; --bar-color: ${dim.color};" data-width="${pct}"></div>
+                </div>
+            </div>
+        `;
+    }).join('');
+    
+    // 人格标签
+    const tagsHtml = personalityType.tags.map(tag =>
+        `<span class="personality-tag">${tag}</span>`
+    ).join('');
+    
+    // 突出维度描述
+    const topDimDesc = topDims.map(d =>
+        `<span class="top-dim-badge" style="--dim-color: ${d.color};">${d.icon} ${d.name}</span>`
+    ).join('');
+    
+    return `
+        <div class="personality-card">
+            <div class="personality-header">
+                <div class="personality-emoji">${personalityType.emoji}</div>
+                <div class="personality-title-area">
+                    <h3 class="personality-name">${personalityType.name}</h3>
+                    <p class="personality-subtitle">${personalityType.subtitle}</p>
+                </div>
+            </div>
+            
+            <div class="personality-desc">
+                <p>${personalityType.description}</p>
+            </div>
+            
+            <div class="personality-tags-area">
+                ${tagsHtml}
+            </div>
+            
+            <div class="personality-dims-title">
+                <span>你的人格画像</span>
+                <span class="top-dims-label">突出维度：${topDimDesc}</span>
+            </div>
+            
+            <div class="trait-bars">
+                ${radarBars}
+            </div>
+            
+            <div class="personality-advice">
+                <div class="advice-icon">💡</div>
+                <p>${personalityType.advice}</p>
+            </div>
+        </div>
+    `;
+}
+
+// 生成人格分析HTML（用于截图，内联样式版本）
+function generatePersonalityImageHtml(scores, personalityType) {
+    const dims = ['O', 'C', 'E', 'A', 'N'];
+    const topDims = getTopDimensions(scores);
+    
+    // 维度条
+    const barsHtml = dims.map(key => {
+        const dim = traitDimensions[key];
+        const pct = Math.round(scores[key] * 100);
+        return `
+            <div style="margin-bottom: 12px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                    <span style="font-size: 13px; color: #d1d5db;">${dim.icon} ${dim.name}</span>
+                    <span style="font-size: 12px; color: #9ca3af;">${pct}%</span>
+                </div>
+                <div style="height: 8px; background: rgba(255,255,255,0.08); border-radius: 4px; overflow: hidden;">
+                    <div style="height: 100%; width: ${pct}%; background: ${dim.color}; border-radius: 4px;"></div>
+                </div>
+            </div>
+        `;
+    }).join('');
+    
+    // 标签
+    const tagsHtml = personalityType.tags.map(tag =>
+        `<span style="display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 12px; 
+            background: rgba(139, 92, 246, 0.15); border: 1px solid rgba(139, 92, 246, 0.3); 
+            color: #c4b5fd; margin: 3px;">${tag}</span>`
+    ).join('');
+    
+    // 突出维度
+    const topDimHtml = topDims.map(d =>
+        `<span style="display: inline-flex; align-items: center; gap: 3px; padding: 3px 10px; 
+            border-radius: 12px; font-size: 12px; background: rgba(255,255,255,0.05); 
+            color: ${d.color};">${d.icon} ${d.name}</span>`
+    ).join(' ');
+    
+    return `
+        <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); 
+            border-radius: 16px; padding: 28px; margin-bottom: 32px;">
+            <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 20px;">
+                <div style="font-size: 48px; width: 64px; height: 64px; display: flex; align-items: center; 
+                    justify-content: center; background: rgba(139, 92, 246, 0.15); border-radius: 16px;">
+                    ${personalityType.emoji}
+                </div>
+                <div>
+                    <h3 style="font-family: 'Noto Serif SC', serif; font-size: 24px; font-weight: 700; 
+                        color: #e2e8f0; margin-bottom: 4px;">${personalityType.name}</h3>
+                    <p style="font-size: 13px; color: #9ca3af;">${personalityType.subtitle}</p>
+                </div>
+            </div>
+            
+            <p style="font-size: 14px; line-height: 1.8; color: #b0b8c8; margin-bottom: 16px;">
+                ${personalityType.description}
+            </p>
+            
+            <div style="display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 20px;">
+                ${tagsHtml}
+            </div>
+            
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
+                <span style="font-size: 13px; color: #9ca3af;">人格画像</span>
+                <span style="font-size: 12px; color: #6b7280;">突出维度：${topDimHtml}</span>
+            </div>
+            
+            ${barsHtml}
+            
+            <div style="display: flex; align-items: flex-start; gap: 10px; margin-top: 20px; padding: 14px; 
+                background: rgba(139, 92, 246, 0.08); border-radius: 12px; border: 1px solid rgba(139, 92, 246, 0.15);">
+                <span style="font-size: 18px; flex-shrink: 0;">💡</span>
+                <p style="font-size: 13px; line-height: 1.7; color: #c4b5fd;">${personalityType.advice}</p>
+            </div>
+        </div>
+    `;
+}
+
 // 重新开始
 function restart() {
     state.currentStage = 0;
     state.selectedWishes.clear();
     state.vanishedWishes.clear();
+    state.triggeredVanish.clear();
     state.stageSelections = {};
     state.totalSelected = 0;
     state.totalVanished = 0;
